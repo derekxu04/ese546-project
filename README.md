@@ -6,7 +6,8 @@ Lightweight playground for experimenting with the Tiny Recursive Model (TRM) fro
 
 - `tiny_trm_model.py` – standalone TRM implementation (config + model + helper funcs).
 - `data_sudoku.py` – utilities for preparing Sudoku data. Supports a built-in toy dataset (default) or the full `sapientinc/sudoku-extreme` release from Hugging Face.
-- `train_trm.py` – command-line training script with editable configuration.
+- `train_trm.py` – standard cross-entropy training script with editable configuration.
+- `train_trm_jepa.py` – variant that adds a JEPA-style latent alignment loss inspired by [LLM-JEPA](https://arxiv.org/abs/2509.14252).
 
 ## Environment Setup
 
@@ -30,6 +31,21 @@ Key behavior:
 - By default, the script uses the **built-in toy dataset** defined in `data_sudoku.py` so nothing large is downloaded.
 - The resolved configuration is stored in `RUN_CONFIG` inside `train_trm.py`. Modify that dictionary or supply `--config custom.json` (same structure) to tweak hyperparameters, dataset paths, etc.
 - Model checkpoints are saved under `runs/tiny_trm_sudoku/` (`best.pt`, `last.pt`).
+
+### JEPA-style Training
+
+```bash
+source .venv/bin/activate
+python train_trm_jepa.py
+```
+
+This script runs TRM on both puzzles and solutions, then minimizes an additional latent distance between their final hidden states (similar to LLM-JEPA). Extra knobs in `RUN_CONFIG["training"]`:
+
+- `latent_loss_weight`: scales the JEPA penalty (set to `0.0` to disable).
+- `latent_pool`: `"mean"` (default) or `"cls"` to aggregate sequence states.
+- `normalize_latent`: whether to L2-normalize representations before computing MSE.
+- `stopgrad_target`: if `True`, the target (solution) branch is stop-grad, mimicking JEPA's target encoder.
+- Checkpoints go under `runs/tiny_trm_sudoku_jepa/`.
 
 ## Dataset Options
 

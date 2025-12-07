@@ -153,6 +153,7 @@ class TinyRecursiveModel(nn.Module):
         self,
         inputs: torch.Tensor,
         puzzle_ids: Optional[torch.Tensor] = None,
+        return_hidden: bool = False,
     ) -> torch.Tensor:
         """Forward pass.
 
@@ -179,6 +180,8 @@ class TinyRecursiveModel(nn.Module):
             z_high = self.reasoner(z_high, z_low)
 
         logits = self.head(z_high)
+        if return_hidden:
+            return logits, z_high
         return logits
 
     @torch.no_grad()
