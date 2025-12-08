@@ -174,10 +174,26 @@ class TinyRecursiveModel(nn.Module):
         z_high = self.init_high.expand(batch_size, -1, -1)
         z_low = self.init_low.expand(batch_size, -1, -1)
 
-        for _ in range(self.config.H_cycles):
-            for _ in range(self.config.L_cycles):
-                z_low = self.reasoner(z_low, emb)
-            z_high = self.reasoner(z_high, z_low)
+        if self.config.H_cycles <= 0:
+            raise ValueError("H_cycles must be positive")
+        if self.config.L_cycles <= 0:
+            raise ValueError("L_cycles must be positive")
+
+        # Mirror the paper: all but the very last (H, L) refinement run without grad,
+        # so only a single final update pair participates in backprop.
+        with torch.no_grad():
+            for h_idx in range(self.config.H_cycles):
+                for l_idx in range(self.config.L_cycles):
+                    is_final_update = (h_idx == self.config.H_cycles - 1) and (l_idx == self.config.L_cycles - 1)
+                    if not is_final_update:
+                        z_low = self.reasoner(z_low, emb)
+                if h_idx != self.config.H_cycles - 1:
+                    z_high = self.reasoner(z_high, z_low)
+        assert not z_high.requires_grad and not z_low.requires_grad
+
+        # Final refinement with gradients enabled.
+        z_low = self.reasoner(z_low, emb)
+        z_high = self.reasoner(z_high, z_low)
 
         logits = self.head(z_high)
         if return_hidden:
