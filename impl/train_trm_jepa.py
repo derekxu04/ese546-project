@@ -7,7 +7,6 @@ predicts masked cell latents from the visible context.
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,48 +20,8 @@ from data_sudoku import SudokuDataConfig, SudokuDataset, prepare_sudoku_dataset
 from trm_jepa import TinyRecursiveModel, TRMConfig
 
 
-RUN_CONFIG: Dict = {
-    "model": {
-        "hidden_size": 256,
-        "num_heads": 4,
-        "num_layers": 2,
-        "num_latent_refinements": 6,
-        "num_refinement_blocks": 3,
-        "max_supervision_steps": 4,
-        "halt_prob_threshold": 0.5,
-        "vocab_size": 10,
-        "seq_len": 81,
-        "dropout": 0.0,
-        "spatial_mask_ratio": 0.3,
-        "spatial_min_targets": 8,
-        "spatial_mask_token": 0,
-        "jepa_predictor_hidden": 256,
-        "jepa_predictor_layers": 2,
-        "stopgrad_target": True,
-    },
-    "data": {
-        "dataset_dir": "data/sudoku-toy",
-        "train_subset": 2000,
-        "force_download": False,
-        "use_builtin_sample": True,
-    },
-    "training": {
-        "epochs": 1000,
-        "batch_size": 128,
-        "lr": 3e-4,
-        "weight_decay": 0.01,
-        "grad_clip": 1.0,
-        "eval_interval": 1,
-        "run_eval": False,
-        "log_interval": 100,
-        "halt_loss_weight": 0.001, # is either buggy rn or just due to small dataset, will debug if needed when testing on larger dataset
-        "jepa_loss_weight": 0.000005,
-        "seed": 0,
-        "num_workers": 0,
-        "output_dir": "runs/tiny_trm_impl_sudoku_jepa",
-        "device": None,
-    },
-}
+CONFIG_DIR = Path(__file__).parent / "configs"
+DEFAULT_CONFIG_PATH = CONFIG_DIR / "trm_jepa_default.json"
 
 
 @dataclass
@@ -93,7 +52,8 @@ def deep_update(base: Dict, override: Dict) -> Dict:
 
 
 def load_run_config(path: Optional[str]) -> Dict:
-    cfg = copy.deepcopy(RUN_CONFIG)
+    with open(DEFAULT_CONFIG_PATH) as handle:
+        cfg = json.load(handle)
     if path is None:
         return cfg
     with open(path) as handle:
@@ -272,6 +232,7 @@ def evaluate(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train TRM+JEPA (impl version) on Sudoku")
     parser.add_argument("--config", type=str, default=None, help="Path to JSON config override")
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from")
     args = parser.parse_args()
 
     cfg_dict = load_run_config(args.config)
@@ -291,12 +252,24 @@ def main() -> None:
         weight_decay=training_cfg.weight_decay,
     )
 
+    start_epoch = 1
+    best_acc = 0.0
+    if args.resume is not None:
+        checkpoint = torch.load(args.resume, map_location=device)
+        model.load_state_dict(checkpoint["model_state"])
+        optimizer_state = checkpoint.get("optimizer_state")
+        if optimizer_state is not None:
+            optimizer.load_state_dict(optimizer_state)
+        best_acc = checkpoint.get("best_acc", checkpoint.get("eval_stats", {}).get("puzzle_acc", 0.0))
+        start_epoch = checkpoint.get("epoch", 0) + 1
+        print(f"Resumed from {args.resume} at epoch {start_epoch - 1}")
+
     output_dir = Path(training_cfg.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    best_acc = 0.0
 
+    last_epoch = start_epoch - 1
     print(f"Model parameters: {count_parameters(model):,}")
-    for epoch in range(1, training_cfg.epochs + 1):
+    for epoch in range(start_epoch, training_cfg.epochs + 1):
         train_stats = train_epoch(
             model,
             loaders["train"],
@@ -336,12 +309,23 @@ def main() -> None:
                     "optimizer_state": optimizer.state_dict(),
                     "epoch": epoch,
                     "eval_stats": eval_stats,
+                    "best_acc": best_acc,
                     "config": cfg_dict,
                 }
                 torch.save(checkpoint, output_dir / "best.pt")
                 print("           Saved new best checkpoint.")
+        last_epoch = epoch
 
-    torch.save({"model_state": model.state_dict(), "config": cfg_dict}, output_dir / "last.pt")
+    torch.save(
+        {
+            "model_state": model.state_dict(),
+            "optimizer_state": optimizer.state_dict(),
+            "epoch": last_epoch,
+            "best_acc": best_acc,
+            "config": cfg_dict,
+        },
+        output_dir / "last.pt",
+    )
     print("Training complete. Checkpoints stored in", output_dir)
 
 

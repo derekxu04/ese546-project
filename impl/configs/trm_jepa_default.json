@@ -1,0 +1,42 @@
+{
+  "model": {
+    "hidden_size": 256,
+    "num_heads": 4,
+    "num_layers": 2,
+    "num_latent_refinements": 6,
+    "num_refinement_blocks": 3,
+    "max_supervision_steps": 4,
+    "halt_prob_threshold": 0.5,
+    "vocab_size": 10,
+    "seq_len": 81,
+    "dropout": 0.0,
+    "spatial_mask_ratio": 0.3,
+    "spatial_min_targets": 8,
+    "spatial_mask_token": 0,
+    "jepa_predictor_hidden": 256,
+    "jepa_predictor_layers": 2,
+    "stopgrad_target": true
+  },
+  "data": {
+    "dataset_dir": "data/sudoku-extreme-mini",
+    "train_subset": 2000,
+    "force_download": false,
+    "use_builtin_sample": false
+  },
+  "training": {
+    "epochs": 1000,
+    "batch_size": 128,
+    "lr": 0.0003,
+    "weight_decay": 0.01,
+    "grad_clip": 1.0,
+    "eval_interval": 1,
+    "run_eval": false,
+    "log_interval": 100,
+    "halt_loss_weight": 0.001,
+    "jepa_loss_weight": 0.000005,
+    "seed": 0,
+    "num_workers": 0,
+    "output_dir": "runs/tiny_trm_impl_sudoku_jepa",
+    "device": null
+  }
+}
