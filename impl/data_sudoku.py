@@ -36,7 +36,7 @@ BUILTIN_PUZZLES: Tuple[Tuple[str, str], ...] = (
 
 @dataclass
 class SudokuDataConfig:
-    dataset_dir: str = "data/sudoku-extreme-mini"
+    dataset_dir: str = "data/sudoku-extreme"
     repo_id: str = "sapientinc/sudoku-extreme"
     splits: Tuple[str, ...] = ("train", "test")
     train_subset: Optional[int] = None
@@ -149,6 +149,13 @@ if __name__ == "__main__":
     cfg = SudokuDataConfig(train_subset=100)
     paths = prepare_sudoku_dataset(cfg)
     print("Prepared:", paths)
-    ds = SudokuDataset(cfg.dataset_dir, split="train")
-    sample = ds[0]
-    print("Sample keys:", sample.keys())
+
+    # Try to instantiate the Dataset only if PyTorch is available; otherwise print a
+    # helpful message so users can download the CSV->NPZ files without needing torch
+    try:
+        ds = SudokuDataset(cfg.dataset_dir, split="train")
+        sample = ds[0]
+        print("Sample keys:", sample.keys())
+    except Exception as e:
+        print("Could not instantiate SudokuDataset (PyTorch may be missing):", str(e))
+        print("The dataset CSV files were downloaded and converted to .npz in the dataset directory.")

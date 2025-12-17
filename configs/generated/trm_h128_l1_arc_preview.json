@@ -1,0 +1,18 @@
+{
+  "model": {
+    "hidden_size": 128,
+    "num_layers": 1
+  },
+  "training": {
+    "epochs": 1,
+    "batch_size": 128,
+    "lr": 0.0003,
+    "output_dir": "runs/experiments/trm_h128_l1",
+    "device": "cuda"
+  },
+  "data": {
+    "dataset_type": "arc",
+    "dataset_dir": "data/arc-agi-2-clean-augmented",
+    "train_subset": 8
+  }
+}

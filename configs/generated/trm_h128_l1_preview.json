@@ -1,0 +1,15 @@
+{
+  "model": {
+    "hidden_size": 128,
+    "num_layers": 1
+  },
+  "training": {
+    "epochs": 3,
+    "batch_size": 128,
+    "lr": 0.0003,
+    "output_dir": "runs/experiments_main/trm_h128_l1"
+  },
+  "data": {
+    "train_subset": 128
+  }
+}

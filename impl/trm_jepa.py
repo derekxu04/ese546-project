@@ -222,7 +222,7 @@ class TinyRecursiveModel(nn.Module):
         inputs = self.input_embed(x) + self.pos_embed
         outputs, latents = self.get_initial()
 
-        active_batch_indices = torch.arange(batch_size, device=x.device, dtype=torch.float32)
+        active_batch_indices = torch.arange(batch_size, device=x.device, dtype=torch.long)
 
         preds = []
         exited_step_indices = []
@@ -313,7 +313,8 @@ class TinyRecursiveModel(nn.Module):
         predicted = self.spatial_predictor(context_latents)
         diff = (predicted - target_latents).pow(2)
         mask = target_mask.unsqueeze(-1).to(diff.dtype)
-        loss = (diff * mask).sum() / mask.sum().clamp_min(1.0)
+        loss = (diff * mask).sum() / (mask.sum() * diff.size(-1)).clamp_min(1.0)
+
         return loss, target_mask
 
 if __name__ == "__main__":  # small sanity check

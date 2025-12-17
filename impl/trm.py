@@ -202,7 +202,7 @@ class TinyRecursiveModel(nn.Module):
         inputs = self.input_embed(x) + self.pos_embed
         outputs, latents = self.get_initial()
 
-        active_batch_indices = torch.arange(batch_size, device=x.device, dtype=torch.float32)
+        active_batch_indices = torch.arange(batch_size, device=x.device, dtype=torch.long)
 
         preds = []
         exited_step_indices = []

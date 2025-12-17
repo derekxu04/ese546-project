@@ -1,15 +1,19 @@
 {
   "model": {
-    "hidden_size": 256,
-    "num_heads": 4,
-    "num_layers": 2,
+    "hidden_size": 64,
+    "num_heads": 2,
+    "num_layers": 1,
     "num_latent_refinements": 2,
     "num_refinement_blocks": 1,
     "max_supervision_steps": 2,
     "halt_prob_threshold": 0.5,
     "vocab_size": 10,
     "seq_len": 81,
-    "dropout": 0.0
+    "dropout": 0.0,
+    "spatial_mask_ratio": 0.3,
+    "jepa_predictor_hidden": 32,
+    "jepa_predictor_layers": 1,
+    "stopgrad_target": true
   },
   "data": {
     "dataset_dir": "data/sudoku-extreme",
@@ -18,18 +22,20 @@
     "use_builtin_sample": false
   },
   "training": {
-    "epochs": 100,
+    "epochs": 200,
     "batch_size": 512,
     "lr": 0.0003,
     "weight_decay": 0.01,
     "grad_clip": 1.0,
-    "eval_interval": 10,
+    "eval_interval": 1,
     "run_eval": true,
     "log_interval": 10,
     "halt_loss_weight": 1.0,
+    "halt_warmup_epochs": 0,
+    "jepa_loss_weight": 0.0001,
     "seed": 0,
     "num_workers": 0,
-    "output_dir": "runs/tiny_trm_impl_sudoku",
-    "device": null
+    "output_dir": "runs/experiments_main/trm_jepa_fast",
+    "device": "cuda"
   }
 }
