@@ -1,0 +1,16 @@
+{
+  "model": {
+    "hidden_size": 256,
+    "spatial_mask_ratio": 0.3
+  },
+  "training": {
+    "epochs": 15,
+    "batch_size": 128,
+    "lr": 0.0003,
+    "jepa_loss_weight": 0.0001,
+    "output_dir": "runs/experiments_main/jepa_h256_w0p0001"
+  },
+  "data": {
+    "train_subset": 512
+  }
+}

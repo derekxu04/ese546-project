@@ -1,0 +1,17 @@
+{
+  "model": {
+    "hidden_size": 128,
+    "spatial_mask_ratio": 0.3
+  },
+  "training": {
+    "epochs": 20,
+    "batch_size": 128,
+    "lr": 0.0003,
+    "jepa_loss_weight": 1e-05,
+    "output_dir": "runs/experiments_refine_full/jepa_h128_w1em05",
+    "device": "cuda"
+  },
+  "data": {
+    "train_subset": 512
+  }
+}

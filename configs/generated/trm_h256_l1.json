@@ -1,0 +1,14 @@
+{
+  "model": {
+    "hidden_size": 256,
+    "num_layers": 1
+  },
+  "training": {
+    "epochs": 300,
+    "batch_size": 128,
+    "lr": 0.0003,
+    "output_dir": "runs/experiments_trm_vs_jepa/trm_h256_l1",
+    "device": "cuda"
+  },
+  "data": {}
+}

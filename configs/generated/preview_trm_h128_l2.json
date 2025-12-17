@@ -1,0 +1,16 @@
+{
+  "model": {
+    "hidden_size": 128,
+    "num_layers": 2
+  },
+  "training": {
+    "epochs": 5,
+    "batch_size": 128,
+    "lr": 0.0003,
+    "output_dir": "runs/experiments_trm_vs_jepa/trm_h128_l2",
+    "device": "cuda"
+  },
+  "data": {
+    "train_subset": 512
+  }
+}
