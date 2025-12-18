@@ -2,7 +2,7 @@
   "model": {
     "hidden_size": 256,
     "num_heads": 4,
-    "num_layers": 2,
+    "num_layers": 1,
     "num_latent_refinements": 2,
     "num_refinement_blocks": 1,
     "max_supervision_steps": 2,
@@ -24,7 +24,7 @@
     "use_builtin_sample": false
   },
   "training": {
-    "epochs": 100,
+    "epochs": 200,
     "batch_size": 512,
     "lr": 0.0003,
     "weight_decay": 0.01,

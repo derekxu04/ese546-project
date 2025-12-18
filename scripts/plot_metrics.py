@@ -7,12 +7,16 @@ import matplotlib.pyplot as plt
 def plot_metrics(csv_path: str, out_dir: str):
     df = pd.read_csv(csv_path)
     os.makedirs(out_dir, exist_ok=True)
+    def infer_model_name(csv_path: str) -> str:
+        name = csv_path.lower()
+        if "jepa" in name:
+            return "TRM + JEPA"
+        return "TRM"
 
     print(f"Loaded CSV with columns: {df.columns.tolist()}")
-
-    # -----------------------------
+    model_name = infer_model_name(csv_path)
+    
     # Sanity checks for test metrics
-    # -----------------------------
     if "Test Loss" in df.columns:
         n_test = df["Test Loss"].notna().sum()
         print(f"Test Loss points: {n_test}")
@@ -26,23 +30,20 @@ def plot_metrics(csv_path: str, out_dir: str):
         n_test_acc = df["Test Token Acc"].notna().sum()
         print(f"Test Token Acc points: {n_test_acc}")
 
-    # ============================================================
-    # Plot 1: CE-only loss (TRAIN vs TEST)  <-- MAIN COMPARISON
-    # ============================================================
-    if "CE Loss" in df.columns:
+    if "Train CE Loss" in df.columns:
         plt.figure(figsize=(10, 6))
         plt.plot(
             df["Epoch"],
-            df["CE Loss"],
+            df["Train CE Loss"],
             label="Train CE Loss",
             linewidth=2,
         )
 
-        if "Test Loss" in df.columns and df["Test Loss"].notna().any():
-            mask = df["Test Loss"].notna()
+        if "Test CE Loss" in df.columns and df["Test CE Loss"].notna().any():
+            mask = df["Test CE Loss"].notna()
             plt.plot(
                 df.loc[mask, "Epoch"],
-                df.loc[mask, "Test Loss"],
+                df.loc[mask, "Test CE Loss"],
                 label="Test CE Loss",
                 linewidth=2,
                 linestyle="--",
@@ -51,45 +52,41 @@ def plot_metrics(csv_path: str, out_dir: str):
 
         plt.xlabel("Epoch")
         plt.ylabel("Cross-Entropy Loss")
-        plt.title("Train vs Test CE Loss")
+        plt.title(f"{model_name}: Train vs Test CE Loss")
         plt.grid(alpha=0.3)
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(out_dir, "ce_loss.png"), dpi=120)
         plt.close()
-    else:
-        print("Skipping CE-loss plot (column 'CE Loss' not found).")
-
     # ============================================================
     # Plot 2: Total training objective (TRAIN ONLY)
     # ============================================================
-    if "Train Loss" in df.columns:
+    if "Train Total Loss" in df.columns:
         plt.figure(figsize=(10, 6))
         plt.plot(
             df["Epoch"],
-            df["Train Loss"],
+            df["Train Total Loss"],
             label="Train Total Loss",
             linewidth=2,
         )
+
         plt.xlabel("Epoch")
-        plt.ylabel("Total Training Loss")
-        plt.title("Training Objective (CE + Halt + JEPA)")
+        plt.ylabel("Total Loss")
+        plt.title(f"{model_name}: Total Training Loss vs Epoch")
         plt.grid(alpha=0.3)
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(out_dir, "train_total_loss.png"), dpi=120)
         plt.close()
-    else:
-        print("Skipping total train-loss plot (column 'Train Loss' not found).")
 
     # ============================================================
     # Plot 3: Token accuracy (TRAIN vs TEST)
     # ============================================================
-    if "Token Accuracy" in df.columns:
+    if "Train Token Acc" in df.columns:
         plt.figure(figsize=(10, 6))
         plt.plot(
             df["Epoch"],
-            df["Token Accuracy"],
+            df["Train Token Acc"],
             label="Train Token Accuracy",
             linewidth=2,
         )
@@ -107,14 +104,12 @@ def plot_metrics(csv_path: str, out_dir: str):
 
         plt.xlabel("Epoch")
         plt.ylabel("Token Accuracy")
-        plt.title("Token Accuracy vs Epoch")
+        plt.title(f"{model_name}: Token Accuracy vs Epoch")
         plt.grid(alpha=0.3)
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(out_dir, "token_accuracy.png"), dpi=120)
         plt.close()
-    else:
-        print("Skipping token-accuracy plot (column 'Token Accuracy' not found).")
 
     # ============================================================
     # Plot 4: Puzzle accuracy (TEST ONLY)
@@ -132,14 +127,12 @@ def plot_metrics(csv_path: str, out_dir: str):
 
         plt.xlabel("Epoch")
         plt.ylabel("Puzzle Accuracy")
-        plt.title("Test Puzzle Accuracy vs Epoch")
+        plt.title(f"{model_name}: Test Puzzle Accuracy vs Epoch")
         plt.grid(alpha=0.3)
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(out_dir, "test_puzzle_accuracy.png"), dpi=120)
         plt.close()
-    else:
-        print("Skipping puzzle-accuracy plot (no test puzzle accuracy found).")
 
     print(f"Plots written to: {out_dir}")
 
