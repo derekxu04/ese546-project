@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 from einops.layers.torch import Reduce, Rearrange
 
-# -----------------------------------------------------------------------------
 # Configuration helpers
-# -----------------------------------------------------------------------------
 
 @dataclass
 class TRMConfig:
@@ -39,9 +37,7 @@ class TRMConfig:
         return {k: getattr(self, k) for k in self.__dataclass_fields__}
 
 
-# -----------------------------------------------------------------------------
 # Building blocks
-# -----------------------------------------------------------------------------
 
 class TinyRecursiveBlock(nn.Module):
     """Transformer-style block using PyTorch primitives."""
@@ -144,23 +140,19 @@ class TinyRecursiveModel(nn.Module):
             config = TRMConfig.from_dict(config)
         self.config = config
 
-        # tokens -> embeddings
+        # Token + position embeddings
         self.input_embed = nn.Embedding(config.vocab_size, config.hidden_size)
         self.pos_embed = nn.Parameter(torch.zeros(1, config.seq_len, config.hidden_size))
 
         self.network = TinyReasoner(config)
 
-        # initial latents (learned)
-        # note: these have shape (1, seq_len, hidden_size), could just do hidden_size, but different positions on sudoku might have different priors
-        # it is not that many extra parameters, but could do ablation study on this, my hunch is that reduce down to hidden_size minimally impacts performance
+        # Learned initial latents (per-position priors for Sudoku cells)
         init_scale = 0.02
         self.output_init_embed = nn.Parameter(init_scale * torch.randn(1, config.seq_len, config.hidden_size))
         self.latent_init_embed = nn.Parameter(init_scale * torch.randn(1, config.seq_len, config.hidden_size))
 
-        # prediction heads
-        # reverse embedding
+        # Prediction heads: token logits and halting probability
         self.to_pred = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
-        # predicts q_hat (halt probability)
         self.to_halt_pred = nn.Sequential(
             Reduce('b n d -> b d', 'mean'),
             nn.Linear(config.hidden_size, 1, bias = False),
@@ -188,15 +180,14 @@ class TinyRecursiveModel(nn.Module):
         nn.init.normal_(self.to_pred.weight, mean=0.0, std=0.02)
     
     def get_initial(self):
+        # Shared learnable starting outputs/latents (broadcast later).
         outputs = self.output_init_embed
         latents = self.latent_init_embed
 
         return outputs, latents
 
-    # inputs, outputs, latents: (batch_size, seq_len, hidden_size)
     def latent_recursion(self, inputs, outputs, latents):
-        # in the paper, they only use one network to do both the latent update and the output update
-        # the network learns to refine latents if input is passed in, else it refines the output
+        # Refine latents multiple times, then refine outputs once (shared network).
 
         for _ in range(self.config.num_latent_refinements):
             latents = self.network(inputs + outputs + latents)
@@ -204,13 +195,11 @@ class TinyRecursiveModel(nn.Module):
 
         return outputs, latents
         
-    # inputs, ouputs, latents: (batch_size, seq_len, hidden_size)
     def deep_recursion(self, inputs, outputs, latents):
-        # recurse T-1 times to improve y and z (no gradients needed)
+        # Gradient-free refinement blocks, then one tracked refinement.
         with torch.no_grad():
             for _ in range(self.config.num_refinement_blocks - 1):
                 outputs, latents = self.latent_recursion(inputs, outputs, latents)
-        # recurse once to improve y and z
         outputs, latents = self.latent_recursion(inputs, outputs, latents)
 
         return outputs, latents

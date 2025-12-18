@@ -4,9 +4,7 @@ from dataclasses import dataclass
 from typing import Dict
 from einops.layers.torch import Reduce, Rearrange
 
-# -----------------------------------------------------------------------------
 # Configuration helpers
-# -----------------------------------------------------------------------------
 
 @dataclass
 class TRMConfig:
@@ -31,9 +29,7 @@ class TRMConfig:
         return {k: getattr(self, k) for k in self.__dataclass_fields__}
 
 
-# -----------------------------------------------------------------------------
 # Building blocks
-# -----------------------------------------------------------------------------
 
 class TinyRecursiveBlock(nn.Module):
     """Transformer-style block using PyTorch primitives."""

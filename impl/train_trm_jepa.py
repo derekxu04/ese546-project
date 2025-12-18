@@ -77,10 +77,12 @@ def count_parameters(model: torch.nn.Module) -> int:
 
 
 def build_dataloaders(cfg: SudokuDataConfig, train_cfg: TrainingConfig) -> Dict[str, DataLoader]:
+    # Download/cache Sudoku splits and wrap into loaders.
     prepare_sudoku_dataset(cfg)
     train_ds = SudokuDataset(cfg.dataset_dir, split="train")
     #test_split = "test" if (Path(cfg.dataset_dir) / "test.npz").exists() else "train"
     #eval_ds = SudokuDataset(cfg.dataset_dir, split=test_split)
+    # Require a real held-out test split to avoid train/test leakage.
     test_path = Path(cfg.dataset_dir) / "test.npz"
     assert test_path.exists(), (
         "Missing test.npz — refusing to fall back to train split "
@@ -88,6 +90,7 @@ def build_dataloaders(cfg: SudokuDataConfig, train_cfg: TrainingConfig) -> Dict[
     )
     eval_ds = SudokuDataset(cfg.dataset_dir, split="test")
 
+    # Optional deterministic subsample to keep runs manageable.
     if cfg.train_subset is not None and len(train_ds) > cfg.train_subset:
         g = torch.Generator()
         g.manual_seed(cfg.seed)
@@ -115,6 +118,7 @@ def build_dataloaders(cfg: SudokuDataConfig, train_cfg: TrainingConfig) -> Dict[
 
 
 def prepare_initial_states(model: TinyRecursiveModel, batch_size: int) -> tuple[torch.Tensor, torch.Tensor]:
+    # Base latent states shared across the batch (expand to batch size).
     outputs, latents = model.get_initial()
     outputs = outputs.expand(batch_size, -1, -1)
     latents = latents.expand(batch_size, -1, -1)
@@ -122,6 +126,7 @@ def prepare_initial_states(model: TinyRecursiveModel, batch_size: int) -> tuple[
 
 
 def compute_metrics(logits: torch.Tensor, labels: torch.Tensor) -> Dict[str, float]:
+    # Token- and puzzle-level accuracy.
     preds = torch.argmax(logits, dim=-1)
     token_acc = (preds == labels).float().mean().item()
     puzzle_acc = (preds == labels).all(dim=-1).float().mean().item()
@@ -136,11 +141,13 @@ def compute_losses(
     jepa_loss: torch.Tensor,
     jepa_weight: float,
 ) -> Dict[str, torch.Tensor]:
+    # Cross-entropy over all tokens.
     ce = F.cross_entropy(logits.view(-1, logits.size(-1)), labels.view(-1))
     preds = torch.argmax(logits.detach(), dim=-1)
     puzzle_correct = (preds == y).all(dim=-1).float()
     puzzle_correct = 0.9 * puzzle_correct + 0.05 # Label smoothing for halt targets
 
+    # Supervise halting on puzzle correctness with light smoothing.
     halt_loss = F.binary_cross_entropy(halt_prob, puzzle_correct)
     halt_loss = halt_loss.clamp(max=10.0)
 
@@ -222,6 +229,7 @@ def train_epoch(
 
             halt_loss = F.binary_cross_entropy(halt_prob, puzzle_correct)
 
+            # Combine CE + halting + JEPA (JEPA detached to avoid double-backprop).
             total_loss = (
                 ce
                 + train_cfg.halt_loss_weight * halt_loss
@@ -249,6 +257,7 @@ def train_epoch(
             # count supervised examples processed in this optimization step
             stats["examples"] += y.size(0)
 
+            # Early-stop samples that already met halt threshold.
             should_halt = (halt_prob >= model.config.halt_prob_threshold) | is_last
             if should_halt.all():
                 break

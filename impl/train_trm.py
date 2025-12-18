@@ -76,11 +76,13 @@ def count_parameters(model: torch.nn.Module) -> int:
 
 
 def build_dataloaders(cfg: SudokuDataConfig, train_cfg: TrainingConfig) -> Dict[str, DataLoader]:
+    # Download/cache Sudoku data and wrap into loaders.
     prepare_sudoku_dataset(cfg)
     train_ds = SudokuDataset(cfg.dataset_dir, split="train")
     #test_split = "test" if (Path(cfg.dataset_dir) / "test.npz").exists() else "train"
     #eval_ds = SudokuDataset(cfg.dataset_dir, split=test_split)
     test_path = Path(cfg.dataset_dir) / "test.npz"
+    # Enforce held-out test split to avoid train/test leakage.
     assert test_path.exists(), (
         "Missing test.npz — refusing to fall back to train split "
         "(this would cause train/test leakage)."
@@ -114,6 +116,7 @@ def build_dataloaders(cfg: SudokuDataConfig, train_cfg: TrainingConfig) -> Dict[
 
 
 def prepare_initial_states(model: TinyRecursiveModel, batch_size: int) -> tuple[torch.Tensor, torch.Tensor]:
+    # Base latent states shared across batch; expand to batch size.
     outputs, latents = model.get_initial()
     outputs = outputs.expand(batch_size, -1, -1)
     latents = latents.expand(batch_size, -1, -1)
@@ -121,6 +124,7 @@ def prepare_initial_states(model: TinyRecursiveModel, batch_size: int) -> tuple[
 
 
 def compute_metrics(logits: torch.Tensor, labels: torch.Tensor) -> Dict[str, float]:
+    # Token- and puzzle-level accuracy.
     preds = torch.argmax(logits, dim=-1)
     token_acc = (preds == labels).float().mean().item()
     puzzle_acc = (preds == labels).all(dim=-1).float().mean().item()
@@ -134,13 +138,16 @@ def compute_loss(
     halt_loss_weight: float,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
+    # Cross-entropy over all tokens.
     ce = F.cross_entropy(logits.view(-1, logits.size(-1)), labels.view(-1))
 
     preds = torch.argmax(logits.detach(), dim=-1)
     puzzle_correct = (preds == labels).all(dim=-1).float()  # (b,)
 
+    # Halting supervised by puzzle correctness.
     halt_loss = F.binary_cross_entropy(halt_prob, puzzle_correct)
 
+    # Combine CE + halting.
     total = ce + halt_loss_weight * halt_loss
     return total, ce.detach(), halt_loss.detach(), puzzle_correct.detach()
 

@@ -1,72 +1,94 @@
 # Tiny Recursive Model Sandbox
 
-Lightweight playground for experimenting with the Tiny Recursive Model (TRM) from *Less is More: Recursive Reasoning with Tiny Networks*. All actively maintained code lives inside the `impl/` directory.
+Experimental playground for TRM and TRM+JEPA on Sudoku. Actively maintained code lives in `impl/`; experiments and plots are orchestrated from `scripts/` and saved under `runs/` and `plots/`.
 
-## Key Components (all under `impl/`)
+## Repository Layout
 
-- `trm.py` – primary TRM implementation with latent recursion, halting head, and prediction helpers.
-- `data_sudoku.py` – Sudoku dataset utilities (built-in sample + Hugging Face downloader/subsampler).
-- `train_trm.py` – training loop for the `impl/trm.py` model using standard cross-entropy plus halting supervision.
-- `train_trm_jepa.py` – training variant that augments the base loss with a JEPA-style latent alignment term.
+- `impl/`
+  - `trm.py` — core Tiny Recursive Model with latent recursion + halting.
+  - `trm_jepa.py` — TRM with JEPA-style latent alignment head.
+  - `train_trm.py` — training loop for TRM (cross-entropy + halting loss).
+  - `train_trm_jepa.py` — training loop for TRM+JEPA (adds latent alignment loss).
+  - `data_sudoku.py` — dataset prep/downloader (Hugging Face `sapientinc/sudoku-extreme`); supports subsampling via `train_subset`.
+  - `configs/` — default configs for the impl trainers.
 
-## Environment Setup
+- `scripts/`
+  - `run_experiments.py` — experiment driver: preview sweep, selection, full training, and comparison plots.
+  - `compare_runs.py` — plot multiple runs (TRM vs TRM+JEPA) from CSV metrics.
+  - `plot_metrics.py` — single-run metric plots from one CSV.
+  - `plot_metrics.py` / `compare_runs.py` expect CSVs produced by the impl trainers.
+
+- `runs/`
+  - `metrics/` — CSV logs for each run (used by plotting scripts).
+  - `experiments_*` — model checkpoints and outputs per experiment.
+  - `experiment_summary.csv` — selection log from `run_experiments.py`.
+
+- `plots/`
+  - Generated PNGs from `plot_metrics.py` and `compare_runs.py` (train/test CE loss, token accuracy, puzzle accuracy).
+
+## Quickstart
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 pip install --upgrade pip wheel setuptools
-pip install torch torchvision torchaudio numpy einops tqdm huggingface_hub
+pip install torch torchvision torchaudio numpy einops tqdm huggingface_hub pandas matplotlib
 ```
 
-Feel free to add additional packages as you explore.
+If you need a zero-download sanity check, set `use_builtin_sample=true` in a config (uses a tiny embedded 3-puzzle set).
 
-## Running Training (impl version)
+## Training (impl)
 
+### Plain TRM
 ```bash
-source .venv/bin/activate
-python impl/train_trm.py
+source venv/bin/activate
+python impl/train_trm.py --config impl/configs/trm_default.json
 ```
 
-Key behavior:
-- Uses the **built-in toy dataset** (three puzzles) unless you flip `use_builtin_sample=False` in the data config.
-- All knobs live in `impl/train_trm.py`’s `RUN_CONFIG`. Override by editing the dict or passing `--config custom.json` (same structure).
-- Checkpoints land in `runs/tiny_trm_impl_sudoku/` (`best.pt`, `last.pt`).
-- Training logs report token accuracy, the cross-entropy/halting-loss split, and the average halt target.
-
-### JEPA-style Training
-
+### TRM + JEPA
 ```bash
-source .venv/bin/activate
-python impl/train_trm_jepa.py
+source venv/bin/activate
+python impl/train_trm_jepa.py --config impl/configs/trm_jepa_default.json
 ```
 
-This variant feeds both puzzle and solution through TRM and adds a latent-alignment objective, inspired by [LLM-JEPA](https://arxiv.org/abs/2509.14252). Extra knobs in `RUN_CONFIG["training"]`:
+Both trainers download `sapientinc/sudoku-extreme` by default and honor `train_subset` (set to `50_000` in configs to keep runs manageable). Test split is always held out; no fallback to train.
 
-- `latent_loss_weight`: scales the JEPA penalty (set to `0.0` to disable).
-- `latent_pool`: `"mean"` (default) or `"cls"` to aggregate sequence states.
-- `normalize_latent`: whether to L2-normalize representations before computing MSE.
-- `stopgrad_target`: if `True`, the target (solution) branch is stop-grad, mimicking JEPA's target encoder.
-- Checkpoints go under `runs/tiny_trm_sudoku_jepa/`.
+## Experiment Driver (scripts/run_experiments.py)
 
-## Dataset Options
+End-to-end sweep and plotting:
+```bash
+source venv/bin/activate
+python scripts/run_experiments.py \
+  --out-dir runs/experiments_main \
+  --preview-count 0 \
+  --preview-epochs 15 \
+  --preview-subset 512 \
+  --refine-k 1 \
+  --refine-metric token_acc \
+  --full-epochs 500 \
+  --hidden-sizes 128,256 \
+  --trm-layers 1,2,3 \
+  --jepa-weights 1e-04,5e-04,1e-03 \
+  --parallel --gpus 0 --max-procs 1 --force
+```
 
-`impl/data_sudoku.py` supports two modes:
+Phases:
+- Preview: short runs on a subset to score configs (TRM + JEPA families).
+- Selection: top-k per family by `token_acc`.
+- Full: long runs on selected configs.
+- Plots: comparison PNGs in `plots/` and CSVs in `runs/metrics/`.
 
-1. **Built-in toy dataset** (default): set `use_builtin_sample=True` in the data config. A handful of puzzles are embedded directly in the repo so there is zero download cost—ideal for quick sanity checks or when running on low-memory machines.
-2. **Hugging Face dataset** (e.g., `sapientinc/sudoku-extreme` or `SakanaAI/Sudoku-Bench`): set `use_builtin_sample=False`. Optional knobs:
-  - `train_subset`: randomly keep only `train_subset` puzzles before caching.
-  - `splits`: choose which splits to fetch (e.g., `("train",)` to skip test data).
-  - `force_download`: re-fetch even if `.npz` files already exist.
-  - `repo_id`: point to a lighter dataset if you want quicker downloads.
+## Plotting
 
-## Customizing Training
+- Single run: `python scripts/plot_metrics.py --csv runs/metrics/<run>.csv --out plots/<dest>`
+- Compare runs: `python scripts/compare_runs.py --csv <run1>.csv <run2>.csv --labels run1 run2 --out plots/<dest>`
 
-Inside `impl/train_trm.py::RUN_CONFIG`:
-- `model` – controls TRM depth, width, recursion cycles, etc.
-- `data` – points to dataset directory and selection flags described above.
-- `training` – epochs, batch size, learning rate, device override, logging cadence.
+Outputs include train/test CE loss and token/puzzle accuracy curves. Comparison plots style TRM vs JEPA differently.
 
-Example override file (`tiny.json`):
+## Config overrides (keep it small when needed)
+
+You can override any config field with a JSON file. Example:
+
 ```json
 {
   "data": {
@@ -79,12 +101,15 @@ Example override file (`tiny.json`):
   }
 }
 ```
-Run with `python impl/train_trm.py --config tiny.json`.
 
-## Next Steps
+Run with:
 
-- Swap Sudoku for another puzzle dataset by adding a new loader inside `impl/`.
-- Extend `impl/trm.py` with additional features (e.g., Rope, ACT halting).
-- Integrate wandb or TensorBoard logging for richer monitoring.
+```bash
+python impl/train_trm.py --config tiny.json
+```
 
-Happy experimenting! 🎲
+## Data Notes
+
+- Default dataset: `sapientinc/sudoku-extreme` (~3.8M train / 422k test). Configs set `train_subset=50_000` for faster iterations.
+- Subsampling is reproducible via `train_subset` and `seed` in `data_sudoku.py` configs.
+- Test split (`test.npz`) is mandatory; scripts assert its presence to avoid train/test leakage.

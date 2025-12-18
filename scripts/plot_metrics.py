@@ -58,9 +58,8 @@ def plot_metrics(csv_path: str, out_dir: str):
         plt.tight_layout()
         plt.savefig(os.path.join(out_dir, "ce_loss.png"), dpi=120)
         plt.close()
-    # ============================================================
+
     # Plot 2: Total training objective (TRAIN ONLY)
-    # ============================================================
     if "Train Total Loss" in df.columns:
         plt.figure(figsize=(10, 6))
         plt.plot(
@@ -79,9 +78,7 @@ def plot_metrics(csv_path: str, out_dir: str):
         plt.savefig(os.path.join(out_dir, "train_total_loss.png"), dpi=120)
         plt.close()
 
-    # ============================================================
     # Plot 3: Token accuracy (TRAIN vs TEST)
-    # ============================================================
     if "Train Token Acc" in df.columns:
         plt.figure(figsize=(10, 6))
         plt.plot(
@@ -111,9 +108,7 @@ def plot_metrics(csv_path: str, out_dir: str):
         plt.savefig(os.path.join(out_dir, "token_accuracy.png"), dpi=120)
         plt.close()
 
-    # ============================================================
     # Plot 4: Puzzle accuracy (TEST ONLY)
-    # ============================================================
     if "Test Puzzle Acc" in df.columns and df["Test Puzzle Acc"].notna().any():
         plt.figure(figsize=(10, 6))
         mask = df["Test Puzzle Acc"].notna()
