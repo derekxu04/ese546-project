@@ -1,5 +1,36 @@
-.venv/
-data/
+# -----------------------------
+# ML artifacts / outputs
+# -----------------------------
 runs/
+plots/
+data/
+*.pt
+*.pth
+*.ckpt
+*.npz
+*.npy
+
+# logs
+*.log
+
+# -----------------------------
+# Python
+# -----------------------------
 __pycache__/
-*.pem
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# virtual envs
+venv/
+.venv/
+
+# -----------------------------
+# OS / editor
+# -----------------------------
+.DS_Store
+.idea/
+.vscode/
