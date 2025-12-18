@@ -1,14 +1,32 @@
 # -----------------------------
-# ML artifacts / outputs
+# Raw experiment artifacts
 # -----------------------------
-runs/
-plots/
-data/
+runs/*
+plots/*
+data/*
+
+# -----------------------------
+# Keep final results & figures
+# -----------------------------
+!runs/metrics/
+!runs/metrics/*.csv
+!plots/final/
+!plots/final/*.png
+!plots/final/*.pdf
+
+# -----------------------------
+# Model artifacts
+# -----------------------------
 *.pt
 *.pth
 *.ckpt
+
+# -----------------------------
+# Arrays
+# -----------------------------
 *.npz
 *.npy
+
 
 # logs
 *.log

@@ -1,0 +1,1 @@
+Epoch,Train Total Loss,Train Token Acc,Train CE Loss,Train Halt Loss,Train Halt Acc,Test CE Loss,Test Token Acc,Test Puzzle Acc,Eval Token Acc,Eval Puzzle Acc,Epoch Time (s),Peak GPU MB,Throughput (examples/s)

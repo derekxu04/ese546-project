@@ -104,9 +104,7 @@ def read_best_metric(csv_path: str, refine_metric: str, maximize: bool):
 
             return float(series.max() if maximize else series.min())
 
-    # -----------------------------
     # Metric not found
-    # -----------------------------
     return float("-inf") if maximize else float("inf")
 
 def metric_spec(refine_metric: str):
@@ -125,9 +123,7 @@ def metric_spec(refine_metric: str):
     return (["Eval Puzzle Acc", "eval_puzzle_acc"], True)
 
 
-# -----------------------------
 # Parallel runner
-# -----------------------------
 def run_experiments_parallel(
     exps,
     gen_dir,
@@ -230,9 +226,7 @@ def run_experiments_parallel(
     return outputs
 
 
-# -----------------------------
 # Selection helpers
-# -----------------------------
 def split_families(experiments):
     trm = []
     jepa = []
@@ -342,9 +336,7 @@ def select_top_k_per_family(preview_outputs, refine_metric, k_per_family=1):
     return chosen_trm, chosen_jepa
 
 
-# -----------------------------
 # Main
-# -----------------------------
 def main():
     parser = argparse.ArgumentParser()
 
@@ -476,9 +468,7 @@ def main():
 
     experiments = trm_experiments + jepa_experiments
 
-    # -----------------------------
     # Phase A: Preview ALL configs
-    # -----------------------------
     print(f"\n[Phase A] Preview: running {len(experiments)} configs for {args.preview_epochs} epochs "
           f"(subset={args.preview_subset})\n")
 
@@ -527,9 +517,7 @@ def main():
         force=args.force,
     )
 
-    # -----------------------------
     # Phase B: Select best TRM + best JEPA
-    # -----------------------------
     k = max(1, int(args.refine_k))
     chosen_trm, chosen_jepa = select_top_k_per_family(
         preview_outputs=preview_outputs,
@@ -560,9 +548,7 @@ def main():
         print("Done generating configs.")
         return
 
-    # -----------------------------
     # Phase C: Full training ONLY chosen
-    # -----------------------------
     print(f"\n[Phase C] Full training: running {len(chosen)} chosen configs for {args.full_epochs} epochs\n")
 
     full_subset = args.train_subset  # can be None (meaning full data)
@@ -579,9 +565,7 @@ def main():
         force=args.force,
     )
 
-    # -----------------------------
-    # Optional: Compare plots
-    # -----------------------------
+    # Compare plots
     full_csvs = []
     full_labels = []
     for exp, csv_path in full_outputs:

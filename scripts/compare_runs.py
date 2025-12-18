@@ -44,9 +44,7 @@ def compare(csv_paths, labels, out_dir):
             print(f"  {label}: token accuracy columns missing")
 
 
-    # ============================================================
     # Plot 1: Train CE Loss
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         train_ce_col = get_column(df, "Train CE Loss", "CE Loss")
@@ -61,9 +59,7 @@ def compare(csv_paths, labels, out_dir):
     plt.savefig(os.path.join(out_dir, 'train_ce_loss.png'))
     plt.close()
 
-    # ============================================================
-    # Plot 2: Test CE Loss (TRM vs JEPA)  ⭐ MOST IMPORTANT
-    # ============================================================
+    # Plot 2: Test CE Loss (TRM vs JEPA)
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         test_ce_col = get_column(df, "Test CE Loss", "Test Loss")
@@ -84,9 +80,7 @@ def compare(csv_paths, labels, out_dir):
     plt.savefig(os.path.join(out_dir, "compare_test_ce_loss.png"))
     plt.close()
 
-    # ============================================================
     # Plot 3: Train Token Accuracy (TRM vs JEPA)
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         train_acc_col = get_column(df, "Train Token Acc", "Token Accuracy")
@@ -106,9 +100,7 @@ def compare(csv_paths, labels, out_dir):
     plt.savefig(os.path.join(out_dir, "compare_train_token_accuracy.png"))
     plt.close()
 
-    # ============================================================
     # Plot 3b: Train Token Accuracy (Zoomed)
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         train_acc_col = get_column(df, "Train Token Acc", "Token Accuracy")
@@ -123,7 +115,7 @@ def compare(csv_paths, labels, out_dir):
     plt.xlabel("Epoch")
     plt.ylabel("Train Token Accuracy")
     plt.title("Train Token Accuracy (Zoomed)")
-    plt.ylim(0.95, 1.001)   # 👈 KEY CHANGE
+    plt.ylim(0.95, 1.001)
     plt.grid(alpha=0.3)
     plt.legend()
     plt.tight_layout()
@@ -131,9 +123,7 @@ def compare(csv_paths, labels, out_dir):
     plt.close()
 
 
-    # ============================================================
     # Plot 4: Test Token Accuracy (TRM vs JEPA)
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         test_acc_col = get_column(df, "Test Token Acc")
@@ -154,9 +144,7 @@ def compare(csv_paths, labels, out_dir):
     plt.savefig(os.path.join(out_dir, "compare_test_token_accuracy.png"))
     plt.close()
 
-    # ============================================================
     # Plot 4b: Test Token Accuracy (Zoomed)
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         test_acc_col = get_column(df, "Test Token Acc")
@@ -180,9 +168,7 @@ def compare(csv_paths, labels, out_dir):
     plt.close()
 
 
-    # ============================================================
     # Plot 5: Test Puzzle Accuracy (TRM vs JEPA)
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         puzzle_acc_col = get_column(df, "Test Puzzle Acc")
@@ -205,9 +191,7 @@ def compare(csv_paths, labels, out_dir):
 
     print("Generated comparison plots in", out_dir)
 
-    # ============================================================
     # Plot 6: Train − Test Token Accuracy Gap
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         if "Train Token Acc" in df.columns and "Test Token Acc" in df.columns:
@@ -230,9 +214,7 @@ def compare(csv_paths, labels, out_dir):
     plt.savefig(os.path.join(out_dir, "token_acc_gap.png"))
     plt.close()
 
-    # ============================================================
     # Plot 7: Token Error Rate (log scale)
-    # ============================================================
     plt.figure(figsize=(8, 5))
     for df, label, jepa_flag in runs:
         if "Train Token Acc" in df.columns:
@@ -247,7 +229,7 @@ def compare(csv_paths, labels, out_dir):
     plt.xlabel("Epoch")
     plt.ylabel("Train Token Error Rate")
     plt.title("Train Token Error Rate (log scale)")
-    plt.yscale("log")     # 👈 VERY IMPORTANT
+    plt.yscale("log")
     plt.grid(alpha=0.3, which="both")
     plt.legend()
     plt.tight_layout()

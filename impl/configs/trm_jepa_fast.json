@@ -1,6 +1,6 @@
 {
   "model": {
-    "hidden_size": 64,
+    "hidden_size": 128,
     "num_heads": 2,
     "num_layers": 1,
     "num_latent_refinements": 2,
@@ -27,7 +27,7 @@
     "lr": 0.0003,
     "weight_decay": 0.01,
     "grad_clip": 1.0,
-    "eval_interval": 1,
+    "eval_interval": 10,
     "run_eval": true,
     "log_interval": 10,
     "halt_loss_weight": 1.0,
