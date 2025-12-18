@@ -19,7 +19,7 @@
   },
   "data": {
     "dataset_dir": "data/sudoku-extreme",
-    "train_subset": 5000,
+    "train_subset": 20000,
     "force_download": false,
     "use_builtin_sample": false
   },
@@ -34,7 +34,7 @@
     "log_interval": 10,
     "halt_loss_weight": 0.001,
     "halt_warmup_epochs": 50,
-    "jepa_loss_weight": 0.000005,
+    "jepa_loss_weight": 0.0001,
     "seed": 0,
     "num_workers": 0,
     "output_dir": "runs/tiny_trm_impl_sudoku_jepa",

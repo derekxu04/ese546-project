@@ -13,7 +13,7 @@
   },
   "data": {
     "dataset_dir": "data/sudoku-extreme",
-    "train_subset": 5000,
+    "train_subset": 20000,
     "force_download": false,
     "use_builtin_sample": false
   },
