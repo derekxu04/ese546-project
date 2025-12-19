@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import torch
 import torch.nn as nn
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 from einops.layers.torch import Reduce, Rearrange
 import math
 
@@ -20,16 +18,10 @@ class HRMConfig:
     ff_multiplier: float = 4.0
     dropout: float = 0.0
     num_layers: int = 2
-    num_low_refinements: int = 2        # T in HRM - low-level updates per high-level
-    num_refinement_blocks: int = 3      # N in HRM - number of high-level updates
+    num_low_refinements: int = 2        # T in HRM paper - how many L_net updates per H_net update
+    num_refinement_blocks: int = 3      # N in HRM paper - number of H_net updates
     max_supervision_steps: int = 12     # max number of deep supervision steps during training
     halt_prob_threshold: float = 0.5    # threshold for halt probability to stop inference early
-    spatial_mask_ratio: float = 0.3
-    spatial_min_targets: int = 8
-    spatial_mask_token: int = 0
-    jepa_predictor_hidden: int = 256
-    jepa_predictor_layers: int = 1
-    stopgrad_target: bool = True
 
     @classmethod
     def from_dict(cls, cfg: Dict) -> "HRMConfig":
@@ -79,7 +71,13 @@ class TransformerBlock(nn.Module):
 
 
 class LowLevelNetwork(nn.Module):
-    """Low-level network (L_net) that handles rapid, detailed computations."""
+    """Low-level network (L_net) that handles rapid, detailed computations.
+
+    Takes as input:
+    - zL: low-level state
+    - zH: high-level state (for guidance)
+    - x: input embeddings
+    """
 
     def __init__(self, config):
         super().__init__()
@@ -96,6 +94,16 @@ class LowLevelNetwork(nn.Module):
         )
 
     def forward(self, zL, zH, x):
+        """Update low-level state with guidance from high-level and input.
+
+        Args:
+            zL: Low-level state [batch, seq_len, hidden]
+            zH: High-level state [batch, seq_len, hidden]
+            x: Input embeddings [batch, seq_len, hidden]
+
+        Returns:
+            Updated low-level state
+        """
         # Combine all inputs - low-level state attends to itself, high-level guidance, and inputs
         hidden_states = zL + zH + x
         for layer in self.layers:
@@ -104,7 +112,12 @@ class LowLevelNetwork(nn.Module):
 
 
 class HighLevelNetwork(nn.Module):
-    """High-level network (H_net) that handles slow, abstract planning."""
+    """High-level network (H_net) that handles slow, abstract planning.
+
+    Takes as input:
+    - zH: high-level state
+    - zL: low-level state (for feedback)
+    """
 
     def __init__(self, config):
         super().__init__()
@@ -121,6 +134,15 @@ class HighLevelNetwork(nn.Module):
         )
 
     def forward(self, zH, zL):
+        """Update high-level state with feedback from low-level.
+
+        Args:
+            zH: High-level state [batch, seq_len, hidden]
+            zL: Low-level state [batch, seq_len, hidden]
+
+        Returns:
+            Updated high-level state
+        """
         # High-level state attends to itself and low-level feedback
         hidden_states = zH + zL
         for layer in self.layers:
@@ -129,9 +151,9 @@ class HighLevelNetwork(nn.Module):
 
 
 # -----------------------------------------------------------------------------
-# Hierarchical Reasoning Model with JEPA
+# Hierarchical Reasoning Model
 #
-# Based on HRM pseudocode:
+# Based on following pseudocode from paper:
 #
 # def hrm(z, x, N=2, T=2):
 #     x = input_embedding(x)
@@ -146,14 +168,27 @@ class HighLevelNetwork(nn.Module):
 #     zH = H_net(zH, zL)
 #     return (zH, zL), output_head(zH)
 #
-# Combined with JEPA spatial masking loss for learning representations
+# # Deep Supervision
+# for x, y_true in train_dataloader:
+#     z = z_init
+#     for step in range(N_supervision):
+#         z, y_hat = hrm(z, x)
+#         loss = softmax_cross_entropy(y_hat, y_true)
+#         z = z.detach()
+#         loss.backward()
+#         opt.step()
+#         opt.zero_grad()
 # -----------------------------------------------------------------------------
 
 class HierarchicalReasoningModel(nn.Module):
-    """Hierarchical Reasoning Model with JEPA spatial masking.
+    """Hierarchical Reasoning Model with two-level recurrent processing.
 
-    Combines HRM's two-level hierarchical processing with JEPA's self-supervised
-    representation learning via masked token prediction.
+    The model maintains two interacting states:
+    - zH (high-level): Abstract planning state, updated every T low-level steps
+    - zL (low-level): Detailed computation state, updated every step
+
+    This creates a hierarchy where high-level planning guides low-level execution,
+    while low-level feedback informs high-level updates.
     """
 
     def __init__(self, config):
@@ -187,20 +222,6 @@ class HierarchicalReasoningModel(nn.Module):
             Rearrange('... 1 -> ...')
         )
 
-        # JEPA spatial predictor
-        # Predicts masked latent representations from visible context
-        predictor_layers = []
-        in_dim = config.hidden_size
-        for _ in range(max(1, config.jepa_predictor_layers)):
-            predictor_layers.extend([
-                nn.LayerNorm(in_dim),
-                nn.Linear(in_dim, config.jepa_predictor_hidden),
-                nn.GELU(),
-                nn.Linear(config.jepa_predictor_hidden, config.hidden_size),
-            ])
-            in_dim = config.hidden_size
-        self.spatial_predictor = nn.Sequential(*predictor_layers)
-
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -229,6 +250,13 @@ class HierarchicalReasoningModel(nn.Module):
         Performs N * T low-level updates with N high-level updates.
         First (N*T - 1) updates are done without gradients for efficiency.
         Final update retains gradients for learning.
+
+        Args:
+            z: Tuple of (zH, zL) states
+            x: Input embeddings [batch, seq_len, hidden]
+
+        Returns:
+            (z_new, y_hat): Updated states and output predictions
         """
         zH, zL = z
         N = self.config.num_refinement_blocks
@@ -253,7 +281,14 @@ class HierarchicalReasoningModel(nn.Module):
 
     @torch.no_grad()
     def predict(self, x):
-        """Inference with adaptive computation and early halting."""
+        """Inference with adaptive computation and early halting.
+
+        Args:
+            x: Input tokens [batch, seq_len]
+
+        Returns:
+            (predictions, exit_steps): Final predictions and step counts
+        """
         batch_size = x.shape[0]
 
         # Prepare inputs with embedding scaling 
@@ -272,7 +307,7 @@ class HierarchicalReasoningModel(nn.Module):
             # Run HRM step
             (zH, zL), logits = self.hrm_step((zH, zL), inputs)
 
-            # Check halt condition 
+            # Check halt condition
             halt_prob = self.to_halt_pred(zH[:, 0])
             should_halt = (halt_prob >= self.config.halt_prob_threshold) | is_last
 
@@ -305,8 +340,20 @@ class HierarchicalReasoningModel(nn.Module):
         return preds[sort_indices], exited_step_indices[sort_indices]
 
     def forward(self, x, zH, zL):
-        """Forward pass for training with deep supervision."""
-        # Apply embedding scaling 
+        """Forward pass for training with deep supervision.
+
+        During training, only one HRM step is performed per forward call.
+        Deep supervision applies gradients at each step.
+
+        Args:
+            x: Input tokens [batch, seq_len]
+            zH: High-level state [batch, seq_len, hidden]
+            zL: Low-level state [batch, seq_len, hidden]
+
+        Returns:
+            (logits, halt_prob, zH, zL): Predictions, halt probability, updated states
+        """
+        # Apply embedding scaling
         inputs = self.embed_scale * (self.input_embed(x) + self.pos_embed)
         (zH, zL), logits = self.hrm_step((zH, zL), inputs)
 
@@ -315,67 +362,15 @@ class HierarchicalReasoningModel(nn.Module):
 
         return logits, halt_prob, zH, zL
 
-    def encode_latents(self, tokens: torch.Tensor) -> torch.Tensor:
-        """Encode tokens into latent representations using high-level state.
-
-        Used by JEPA to get target and context representations.
-        """
-        batch_size = tokens.shape[0]
-        zH, zL = self.get_initial(batch_size, tokens.device)
-        # Apply embedding scaling 
-        inputs = self.embed_scale * (self.input_embed(tokens) + self.pos_embed)
-        # Run full HRM step to get high-level representation
-        (zH, _), _ = self.hrm_step((zH, zL), inputs)
-        return zH
-
-    def _sample_target_mask(self, batch_size: int, device: torch.device) -> torch.Tensor:
-        """Sample random mask for JEPA spatial masking."""
-        mask = torch.rand(batch_size, self.config.seq_len, device=device) < self.config.spatial_mask_ratio
-        min_targets = max(1, self.config.spatial_min_targets)
-        needs_fill = mask.sum(dim=1, keepdim=True) < min_targets
-        if needs_fill.any():
-            filler = torch.topk(torch.rand(batch_size, self.config.seq_len, device=device), min_targets, dim=1).indices
-            mask.scatter_(1, filler, True)
-        return mask
-
-    def spatial_jepa_loss(
-        self,
-        puzzle_inputs: torch.Tensor,
-        solution_labels: torch.Tensor,
-        target_mask: Optional[torch.Tensor] = None,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute JEPA spatial masking loss.
-
-        Predicts masked cell latents from visible context.
-        Helps learn better representations for hierarchical reasoning.
-        """
-        if target_mask is None:
-            target_mask = self._sample_target_mask(puzzle_inputs.shape[0], puzzle_inputs.device)
-
-        context_tokens = puzzle_inputs.clone()
-        context_tokens[target_mask] = self.config.spatial_mask_token
-
-        context_latents = self.encode_latents(context_tokens)
-        target_latents = self.encode_latents(solution_labels)
-        if self.config.stopgrad_target:
-            target_latents = target_latents.detach()
-
-        predicted = self.spatial_predictor(context_latents)
-        diff = (predicted - target_latents).pow(2)
-        mask = target_mask.unsqueeze(-1).to(diff.dtype)
-        loss = (diff * mask).sum() / mask.sum().clamp_min(1.0)
-        return loss, target_mask
-
 
 if __name__ == "__main__":  # small sanity check
     config = HRMConfig()
     model = HierarchicalReasoningModel(config)
     batch_size = 2
     seq_len = config.seq_len
+    device = torch.device("cpu")
     dummy_input = torch.randint(0, config.vocab_size, (batch_size, seq_len))
-    zH, zL = model.get_initial()
-    zH = zH.expand(batch_size, -1, -1)
-    zL = zL.expand(batch_size, -1, -1)
+    zH, zL = model.get_initial(batch_size, device)
     logits, halt_prob, zH_new, zL_new = model(dummy_input, zH, zL)
     print("Logits shape:", logits.shape)  # Expected: (batch_size, seq_len, vocab_size)
     print("Halt probabilities shape:", halt_prob.shape)  # Expected: (batch_size,)
